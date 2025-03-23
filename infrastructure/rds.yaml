@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: RDS PostgreSQL Instance
+
+Parameters:
+  VPCStack:
+    Type: AWS::EC2::VPC::Id
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+  DBPassword:
+    Type: String
+
+Resources:
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Airflow DB subnet group
+      SubnetIds: !Ref SubnetIds
+
+  AirflowDB:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: 20
+      DBInstanceClass: db.t3.medium
+      Engine: postgres
+      EngineVersion: '13'
+      MasterUsername: airflow
+      MasterUserPassword: !Ref DBPassword
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !GetAtt DBSecurityGroup.GroupId
+      StorageEncrypted: true
+      BackupRetentionPeriod: 7
+      MultiAZ: !If [IsProd, true, false]
+
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RDS security group
+      VpcId: !Ref VPCStack
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref AirflowSecurityGroup
+
+Conditions:
+  IsProd: !Equals [!Ref EnvType, prod]
+
+Outputs:
+  RDSEndpoint:
+    Value: !GetAtt AirflowDB.Endpoint.Address
