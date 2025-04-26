@@ -1,69 +1,61 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: VPC and Network Components
-
-Parameters:
-  EnvType:
-    Type: String
+Description: VPC Stack for Apache Airflow
 
 Resources:
-  AirflowVPC:
+  VPC:
     Type: AWS::EC2::VPC
     Properties:
       CidrBlock: 10.0.0.0/16
       EnableDnsSupport: true
       EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: AirflowVPC
 
   PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref AirflowVPC
+      VpcId: !Ref VPC
       CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
       AvailabilityZone: !Select [0, !GetAZs '']
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [1, !GetAZs '']
 
   PrivateSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref AirflowVPC
-      CidrBlock: 10.0.2.0/24
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.3.0/24
+      MapPublicIpOnLaunch: false
       AvailabilityZone: !Select [0, !GetAZs '']
 
-  InternetGateway:
-    Type: AWS::EC2::InternetGateway
-
-  VPCGatewayAttachment:
-    Type: AWS::EC2::VPCGatewayAttachment
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
     Properties:
-      VpcId: !Ref AirflowVPC
-      InternetGatewayId: !Ref InternetGateway
-
-  NATGateway:
-    Type: AWS::EC2::NatGateway
-    Properties:
-      AllocationId: !GetAtt EIP.AllocationId
-      SubnetId: !Ref PublicSubnet1
-
-  EIP:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: vpc
-
-  AirflowSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Airflow cluster communication
-      VpcId: !Ref AirflowVPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          CidrIp: 0.0.0.0/0
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.4.0/24
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Select [1, !GetAZs '']
 
 Outputs:
   VPCId:
-    Value: !Ref AirflowVPC
+    Value: !Ref VPC
+    Export:
+      Name: AirflowVPCId
+
   PublicSubnets:
-    Value: !Join [',', [!Ref PublicSubnet1]]
+    Value: !Join [',', [!Ref PublicSubnet1, !Ref PublicSubnet2]]
+    Export:
+      Name: AirflowPublicSubnets
+
   PrivateSubnets:
-    Value: !Join [',', [!Ref PrivateSubnet1]]
-  SecurityGroup:
-    Value: !GetAtt AirflowSecurityGroup.GroupId
+    Value: !Join [',', [!Ref PrivateSubnet1, !Ref PrivateSubnet2]]
+    Export:
+      Name: AirflowPrivateSubnets

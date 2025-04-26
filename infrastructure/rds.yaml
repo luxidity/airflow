@@ -1,51 +1,39 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: RDS PostgreSQL Instance
-
-Parameters:
-  VPCStack:
-    Type: AWS::EC2::VPC::Id
-  SubnetIds:
-    Type: List<AWS::EC2::Subnet::Id>
-  DBPassword:
-    Type: String
+Description: RDS Database for Apache Airflow Metadata
 
 Resources:
-  DBSubnetGroup:
+  AirflowDBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
-      DBSubnetGroupDescription: Airflow DB subnet group
-      SubnetIds: !Ref SubnetIds
+      DBSubnetGroupDescription: Subnet group for Airflow RDS instance
+      SubnetIds:
+        - subnet-0c7e672ca98f567d8
+        - subnet-0a55d951c62449f70
 
-  AirflowDB:
+  AirflowRDSInstance:
     Type: AWS::RDS::DBInstance
     Properties:
+      DBInstanceIdentifier: airflow-metadata-db
       AllocatedStorage: 20
-      DBInstanceClass: db.t3.medium
+      DBInstanceClass: db.t4g.micro  # Free-tier eligible instance type
       Engine: postgres
-      EngineVersion: '13'
-      MasterUsername: airflow
-      MasterUserPassword: !Ref DBPassword
-      DBSubnetGroupName: !Ref DBSubnetGroup
+      EngineVersion: 15.12
+      MasterUsername: airflowadmin
+      MasterUserPassword: airflowpassword  # Replace with a secure password
+      DBSubnetGroupName: !Ref AirflowDBSubnetGroup
       VPCSecurityGroups:
-        - !GetAtt DBSecurityGroup.GroupId
-      StorageEncrypted: true
+        - sg-03dd3c168a2e2f943
       BackupRetentionPeriod: 7
-      MultiAZ: !If [IsProd, true, false]
-
-  DBSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: RDS security group
-      VpcId: !Ref VPCStack
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 5432
-          ToPort: 5432
-          SourceSecurityGroupId: !Ref AirflowSecurityGroup
-
-Conditions:
-  IsProd: !Equals [!Ref EnvType, prod]
+      MultiAZ: false
+      PubliclyAccessible: false
 
 Outputs:
-  RDSEndpoint:
-    Value: !GetAtt AirflowDB.Endpoint.Address
+  RDSInstanceEndpoint:
+    Value: !GetAtt AirflowRDSInstance.Endpoint.Address
+    Export:
+      Name: AirflowRDSInstanceEndpoint
+
+  RDSInstanceArn:
+    Value: !Ref AirflowRDSInstance
+    Export:
+      Name: AirflowRDSInstanceIdentifier
