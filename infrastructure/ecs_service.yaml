@@ -1,0 +1,49 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ECS Task Definition and Service for Apache Airflow
+
+Resources:
+  AirflowTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: AirflowTaskDefinition
+      Cpu: "256"  # 0.25 vCPU
+      Memory: "512"  # 512 MiB
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !ImportValue AirflowTaskExecutionRoleArn
+      ContainerDefinitions:
+        - Name: airflow
+          Image: apache/airflow:2.5.1  # Lightweight Airflow image
+          Essential: true
+          PortMappings:
+            - ContainerPort: 8080
+              Protocol: tcp
+          Environment:
+            - Name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
+              Value: "postgresql+psycopg2://airflowadmin:airflowpassword@airflow-metadata-db.ckh4888261qi.us-east-1.rds.amazonaws.com:5432/airflow"
+            - Name: AIRFLOW__CORE__EXECUTOR
+              Value: "LocalExecutor"
+
+  AirflowService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !ImportValue AirflowECSClusterName
+      ServiceName: AirflowService
+      TaskDefinition: !Ref AirflowTaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets:
+            - subnet-0c7e672ca98f567d8  # Replace with private subnets
+            - subnet-0a55d951c62449f70
+          SecurityGroups:
+            - sg-03dd3c168a2e2f943  # Use the same security group as RDS
+          AssignPublicIp: DISABLED
+
+Outputs:
+  AirflowServiceName:
+    Value: !Ref AirflowService
+    Export:
+      Name: AirflowServiceName
